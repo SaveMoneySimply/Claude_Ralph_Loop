@@ -55,11 +55,12 @@ echo "Firewall configured. All other egress blocked."
 
 # --- DROP TO NON-ROOT ---
 
-# Match the claude user's UID to the workspace owner so it can write to the bind-mounted directory.
-# -o allows the UID to be shared with an existing user (e.g. ubuntu at 1000 in Ubuntu 24.04 base image).
+# Match claude's UID to the workspace owner so files written inside the container
+# are owned by the host user. The ubuntu user is removed in the Dockerfile so
+# claude holds UID 1000 cleanly — no collision, no -o flag needed.
 WORKSPACE_UID=$(stat -c %u /workspace)
 if [ "$WORKSPACE_UID" -gt 0 ] && [ "$(id -u claude)" != "$WORKSPACE_UID" ]; then
-    usermod -u "$WORKSPACE_UID" -o claude
+    usermod -u "$WORKSPACE_UID" claude
     chown -R claude /home/claude
 fi
 

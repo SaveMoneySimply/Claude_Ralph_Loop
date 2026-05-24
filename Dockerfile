@@ -21,8 +21,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Non-root user for loop execution
-RUN useradd -m -s /bin/bash claude
+# Non-root user for loop execution.
+# Remove the ubuntu user that ships in ubuntu:24.04 at UID 1000 so claude can
+# cleanly own UID 1000. This prevents a UID collision when init-firewall.sh runs
+# usermod to match claude's UID to the bind-mounted workspace owner (typically 1000).
+RUN userdel -r ubuntu && useradd -m -s /bin/bash -u 1000 claude
 
 WORKDIR /workspace
 

@@ -20,9 +20,9 @@ A base template for autonomous Claude coding sessions. Fork this repo to start a
 **1. Fork or clone this repo**
 
 ```bash
-git clone https://github.com/MaxCardPoints/Claude_Ralph_Loop my-project
+git clone https://github.com/SaveMoneySimply/Claude_Ralph_Loop my-project
 cd my-project
-git remote set-url origin https://github.com/MaxCardPoints/Claude_Ralph_Loop
+git remote set-url origin https://github.com/SaveMoneySimply/Claude_Ralph_Loop
 ```
 
 **2. Create `ARCHITECTURE.md`**

@@ -67,9 +67,16 @@ Add both to your shell profile so they persist.
 
 [docs.docker.com/get-docker](https://docs.docker.com/get-docker/)
 
+After installing, add yourself to the docker group so you can run Docker without sudo:
+
+```bash
+sudo usermod -aG docker $USER
+# Log out and back in (or run: newgrp docker)
+```
+
 **7. Start Ralph**
 
-If you want Ralph to generate task files from your plans automatically, first create `PLAN.md` (an index of sub-plans) and one or more `plans/*.md` files with your task checklists. Then run breakdown mode:
+`PLAN.md`, `CHANGELOG.md`, and `plans/example.md` ship as stubs in the template — edit them to match your project before running. If you want Ralph to generate task files from your plans automatically, run breakdown mode:
 
 ```bash
 # Breakdown mode: reads plans/*.md and creates task files in tasks/active/
@@ -86,6 +93,8 @@ First run builds the Docker image (a few minutes). Subsequent runs start immedia
 If you modify `Dockerfile` or `init-firewall.sh`, force a rebuild: `docker rmi ralph:latest` then `bash ralph.sh`.
 
 ## Watching progress
+
+`.ralph/` is created on the first container run — these commands require at least one run to have completed.
 
 ```bash
 tail -f .ralph/loop.log          # full log

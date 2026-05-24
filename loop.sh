@@ -14,7 +14,7 @@ FORCE_SPLIT_STEP=50
 
 read_autonomy() {
     grep -i 'autonomy:' ARCHITECTURE.md 2>/dev/null \
-        | grep -oiP '(?<=autonomy:\s{0,5})\w+' | head -1 | tr '[:upper:]' '[:lower:]' \
+        | grep -oiP 'autonomy:\s*\K\w+' | head -1 | tr '[:upper:]' '[:lower:]' \
         || echo "low"
 }
 
@@ -79,13 +79,13 @@ load_recovery() {
         RECOVERY_STEP=0
         RECOVERY_ATTEMPTS=0
         # Read split_depth from task file header (sub-tasks carry this from their creation)
-        RECOVERY_SPLIT_DEPTH=$(grep -oP '(?<=Split depth:\s{0,5})\d+' \
+        RECOVERY_SPLIT_DEPTH=$(grep -oP 'Split depth:\s*\K\d+' \
             "tasks/active/${task}.md" 2>/dev/null | head -1 || echo 0)
-        RECOVERY_PARENT=$(grep -oiP '(?<=Parent task:\s{0,5})\S+' \
+        RECOVERY_PARENT=$(grep -oiP 'Parent task:\s*\K\S+' \
             "tasks/active/${task}.md" 2>/dev/null | head -1 || echo "")
-        RECOVERY_DECL_MODEL=$(grep -oiP '(?<=\bModel:\*\*\s{0,5}|\bModel:\s{0,5})\w+' \
+        RECOVERY_DECL_MODEL=$(grep -oiP '\bModel:(?:\*\*\s*|\s+)\K\w+' \
             "tasks/active/${task}.md" 2>/dev/null | head -1 | tr '[:upper:]' '[:lower:]' || echo "sonnet")
-        RECOVERY_DECL_EFFORT=$(grep -oiP '(?<=\bEffort:\*\*\s{0,5}|\bEffort:\s{0,5})\w+' \
+        RECOVERY_DECL_EFFORT=$(grep -oiP '\bEffort:(?:\*\*\s*|\s+)\K\w+' \
             "tasks/active/${task}.md" 2>/dev/null | head -1 | tr '[:upper:]' '[:lower:]' || echo "high")
     fi
 }

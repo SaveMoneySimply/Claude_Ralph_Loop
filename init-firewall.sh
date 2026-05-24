@@ -55,5 +55,13 @@ echo "Firewall configured. All other egress blocked."
 
 # --- DROP TO NON-ROOT ---
 
+# Match the claude user's UID to the workspace owner so it can write to the bind-mounted directory.
+# -o allows the UID to be shared with an existing user (e.g. ubuntu at 1000 in Ubuntu 24.04 base image).
+WORKSPACE_UID=$(stat -c %u /workspace)
+if [ "$WORKSPACE_UID" -gt 0 ] && [ "$(id -u claude)" != "$WORKSPACE_UID" ]; then
+    usermod -u "$WORKSPACE_UID" -o claude
+    chown -R claude /home/claude
+fi
+
 exec su -s /bin/bash claude -c \
-    "export PATH=/usr/local/bin:/usr/bin:/bin && bash /workspace/loop.sh"
+    "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && bash /workspace/loop.sh"

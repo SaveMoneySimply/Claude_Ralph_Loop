@@ -1,3 +1,6 @@
+# Claude_Ralph_Loop
+Ralph Loop — A template repo for running autonomous Claude Code agents. Fork it to start a new project. The agent works through task files one step at a time in a Docker container, with a firewall, escalation logic, and phone notifications when it stops.
+
 # Ralph Loop — Project Scaffold
 
 A base template for autonomous Claude coding sessions. Fork this repo to start a new project, then let Ralph work through your task list while you do other things.

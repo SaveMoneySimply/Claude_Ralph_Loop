@@ -42,9 +42,9 @@ npm run build && npm test
 # List any extra domains the container needs egress to (beyond the defaults)
 ```
 
-**3. Create `prompt.md`**
+**3. `prompt.md` is already included**
 
-Stays short — Claude re-reads it every iteration. Copy the starter template from `CLAUDE.md → Autonomous Loop → prompt.md`.
+It works for most projects out of the box. Edit it only if your project needs custom navigation logic (different task selection order, extra state checks, etc.).
 
 **4. Add tasks**
 
@@ -69,15 +69,21 @@ Add both to your shell profile so they persist.
 
 **7. Start Ralph**
 
+If you want Ralph to generate task files from your plans automatically, first create `PLAN.md` (an index of sub-plans) and one or more `plans/*.md` files with your task checklists. Then run breakdown mode:
+
 ```bash
-# Optional: let Ralph generate task files from your plans automatically
+# Breakdown mode: reads plans/*.md and creates task files in tasks/active/
 bash ralph.sh plan
 
 # Then run execution mode (or skip breakdown and write task files yourself)
 bash ralph.sh
 ```
 
+If you prefer to write task files directly, skip `bash ralph.sh plan` and just run `bash ralph.sh`.
+
 First run builds the Docker image (a few minutes). Subsequent runs start immediately.
+
+If you modify `Dockerfile` or `init-firewall.sh`, force a rebuild: `docker rmi ralph:latest` then `bash ralph.sh`.
 
 ## Watching progress
 

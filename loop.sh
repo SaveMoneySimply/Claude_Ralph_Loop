@@ -5,7 +5,7 @@ set -uo pipefail
 
 WORKDIR=/workspace
 cd "$WORKDIR"
-mkdir -p .ralph
+mkdir -p .ralph tasks/active tasks/done
 
 # Step number used to force a split on the next iteration
 FORCE_SPLIT_STEP=50
@@ -277,7 +277,7 @@ while [ ! -f STOP ]; do
         fi
         save_recovery "$CURRENT_TASK"
     fi
-    # "unknown" result = task is mid-progress (not the final step); no escalation needed
+    # any other result (e.g. file missing) = treat as no-op; no escalation
 
     # ─── budget check ────────────────────────────────────────────────────
 

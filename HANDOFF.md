@@ -4,59 +4,104 @@
 
 ---
 
-## What was built
+## What the previous session did
 
-This repo (`Claude_Ralph_Loop`) is a base template to fork for new projects. The session built the complete Ralph Loop infrastructure — an autonomous coding system where Claude Code runs headless in a Docker container, working through a task list until done.
+The prior session (HANDOFF-1) built the full Ralph Loop infrastructure. The session before yours (HANDOFF-2) did a readiness review and fixed several issues. Your job is a second-look review and Docker smoke test.
 
-### Files created or significantly changed
+### Files changed in HANDOFF-2 review
 
-- `CLAUDE.md` — rewritten as a loop-first operating manual (per-project, not global). Covers 4-phase workflow, task file format, model/effort per task, stop conditions, git rules, recovery/escalation system, containment, and read-only file review pattern.
-- `Dockerfile` — ubuntu:24.04, Node 20, `@anthropic-ai/claude-code` global, non-root user `claude`
-- `init-firewall.sh` — runs as root at container start; sets iptables egress allowlist (api.anthropic.com, github, npm, ntfy.sh etc.); chmodds CLAUDE.md and ARCHITECTURE.md to 0444; drops to claude user
-- `ralph.sh` — host-side wrapper; builds Docker image if missing; runs container with `/workspace` mount, `ANTHROPIC_API_KEY`, `NTFY_TOPIC`; supports `bash ralph.sh plan` (breakdown mode) and `bash ralph.sh` (execution mode)
-- `loop.sh` — the core while loop inside the container; reads model/effort from task header; runs `claude --model <m> --effort <e> --bare -p --output-format json --dangerously-skip-permissions`; implements full recovery/escalation ladder on failure; checks token budget
-- `prompt.md` — thin navigation wrapper (~30 lines); Claude reads state files, picks next step, executes it, writes `pass` or `fail` to `.ralph/last-result.txt`
-- `prompt-plan.md` — breakdown mode; Claude reads sub-plans and generates task files in `tasks/active/`
-- `prompt-split.md` — split mode; Claude breaks a failing task into 2-3 smaller sub-tasks
-- `README.md` — how to fork the repo and set up a new project
+| File | Change |
+|---|---|
+| `.gitignore` | Created — adds `STOP` and `.ralph/` |
+| `tasks/active/.gitkeep` | Created — tracks directory in git |
+| `tasks/done/.gitkeep` | Created — tracks directory in git |
+| `loop.sh` | `mkdir -p .ralph` → `mkdir -p .ralph tasks/active tasks/done` at startup; fixed misleading comment on line ~280 (was "unknown result = task mid-progress"; now "any other result = treat as no-op") |
+| `README.md` | Step 3 rewritten — `prompt.md` already ships with the repo, not a template to copy; added prerequisite note for plan mode (PLAN.md + plans/ must exist first); added Docker rebuild note |
+| `CLAUDE.md` | Fixed circular "Starter template in the README" reference — now says the file ships with the repo |
 
-### Key design decisions
+### What the HANDOFF-2 session verified as correct (no changes needed)
 
-- **CLAUDE.md is per-project** (checked into the repo, not global). Both CLAUDE.md and ARCHITECTURE.md are chmod 0444 at container init.
-- **Task files are the prompt.** `tasks/active/*.md` is the effective instruction set for each loop iteration. They include `Model:`, `Effort:`, `Tokens estimated:`, `Steps:` (checkboxes), and a `## Smoke test` section.
-- **Model/effort per task.** `loop.sh` reads `Model:` and `Effort:` from the current task header and passes `--model` and `--effort` to each `claude` invocation. Haiku doesn't support `--effort` — the flag is omitted.
-- **`bash ralph.sh plan`** swaps `prompt-plan.md` in as the prompt so Claude generates task files from sub-plans before execution starts.
-- **Recovery/escalation on test gate failure:** declared model+effort (2 attempts) → same model+max → next model+low → next model+max → (up through opus+max) → context expansion (injects last 2 done tasks + next 2 planned tasks) → task split → BLOCKED
-- **Budget exceeded** (2× token estimate): `autonomy: high` → schedule task split; `autonomy: low` → STOP
-- **Task splitting** creates sub-tasks with `**Parent task:**` and `**Split depth:**` headers. Max split depth = 2. Autonomy setting lives in `ARCHITECTURE.md` under `## Ralph settings`.
-- **Recovery log** — every attempt appended to `.ralph/recovery-log.jsonl` for future analysis.
-- **Phone notifications** via ntfy.sh — set `NTFY_TOPIC` env var, loop fires on exit.
-
-### What does NOT exist yet
-
-- `ARCHITECTURE.md` — per-project, must be created when forking. No stub exists.
-- `PLAN.md`, `plans/`, `tasks/` folders — also per-project.
-- `.gitignore` — discussed but not created. Needs `STOP` and `.ralph/` at minimum.
-- Docker has not been tested (not installed on the host). All shell scripts pass `bash -n` syntax check.
-- The loop has not been run end-to-end.
+- `loop.sh` escalation for `haiku` declared — skips effort flag, escalates correctly
+- `loop.sh` escalation for `opus + max` declared — goes straight to context expansion, no infinite loop
+- `load_recovery()` regex — matches both `**Model:** sonnet` and `Model: sonnet` header formats
+- Post-split iteration transition — works correctly (one extra navigation iteration, no correctness issue)
+- `init-firewall.sh` `getent ahosts` — works on Ubuntu 24.04
+- Dockerfile — `loop.sh` correctly accessed from workspace mount, not baked into image
 
 ---
 
-## Your job — review for readiness
+## Your job — second-look review and Docker smoke test
 
-Read every file in the repo and verify the infrastructure is coherent and ready to use on a real project. Then fix anything that's wrong or missing.
+Docker is now installed on the host. Use it.
 
-1. **Consistency check** — do references between files line up? Does what `loop.sh` parses from task headers match what CLAUDE.md says the format is? Does `prompt.md` instruct Claude to write `last-result.txt` in the same format `loop.sh` expects to read it?
+### 1. Re-read every file and verify the HANDOFF-2 changes are correct
 
-2. **Gaps** — what's missing before someone could fork this and run it? `.gitignore` is one known gap. An `ARCHITECTURE.md` stub or template might help. Anything else?
+Check each changed file against the issue it was supposed to fix. Look for:
+- Did the fix actually address the root cause, or just mask it?
+- Did any fix introduce a new inconsistency?
+- Are there issues the HANDOFF-2 agent missed entirely?
 
-3. **Prompt completeness** — are `prompt.md`, `prompt-plan.md`, and `prompt-split.md` clear enough that an agent receiving them cold would know exactly what to do?
+Pay particular attention to:
+- `prompt.md` step 6 — "In progress" steps write `pass`. Does `loop.sh` handle this correctly end-to-end? Trace through a 3-step task where step 2 fails.
+- `prompt-split.md` step 8 — after a split, `last-task.txt` holds the original task name (now in tasks/done/). Trace exactly what happens on the next loop iteration, including which task model/effort gets used.
+- The `--effort` flag for Haiku: `loop.sh` checks `[ "$MODEL" != "haiku" ]` but also has dead code in `get_step_spec` that handles haiku in the `above[]` array for escalation. Is the dead code harmless or does it cause subtle issues?
 
-4. **Edge cases in loop.sh** — trace through the escalation logic for a task declared `haiku` (no effort support) and one declared `opus + max` (already at ceiling). Does the ladder behave correctly?
+### 2. Docker smoke test
 
-5. **README accuracy** — does the README correctly describe how to fork and start?
+Run a minimal end-to-end test. Docker is installed. The container runs as a non-root user with a locked-down firewall, so you'll need to be deliberate.
 
-Report what you find. Fix anything broken or missing. If everything looks good, say so and suggest a simple first project to test the infrastructure end-to-end.
+**Suggested test sequence:**
+
+```bash
+# Build the image
+docker build -t ralph:latest .
+
+# Verify init-firewall.sh runs without errors and drops to claude user
+docker run --rm --cap-add=NET_ADMIN --cap-add=NET_RAW ralph:latest echo "started OK" 2>&1 || true
+# (this will fail because loop.sh runs immediately, but the firewall setup should not error)
+
+# Verify the firewall actually blocks egress to non-allowlisted IPs
+# (run a container that tries to curl a blocked domain and confirm it fails)
+docker run --rm --cap-add=NET_ADMIN --cap-add=NET_RAW \
+  -v "$(pwd):/workspace" \
+  -e ANTHROPIC_API_KEY=dummy \
+  ralph:latest 2>&1 | head -30
+# Should see: firewall setup lines, "Resolving api.anthropic.com...", etc.
+# Should NOT see errors during iptables setup
+
+# Verify the read-only chmod works
+docker run --rm --cap-add=NET_ADMIN --cap-add=NET_RAW \
+  -v "$(pwd):/workspace" \
+  -e ANTHROPIC_API_KEY=dummy \
+  ralph:latest 2>&1 | grep -E "chmod|read.only|0444" || echo "(no chmod output — check init-firewall.sh directly)"
+```
+
+Check for:
+- `iptables` commands succeed without errors
+- `CLAUDE.md` and `ARCHITECTURE.md` (if present) get chmod'd to 0444
+- `loop.sh` is found and starts executing (even if it fails immediately due to dummy API key)
+- No shell errors or missing commands
+
+### 3. Verify `ralph.sh` plan mode mounting
+
+`ralph.sh plan` mounts `prompt-plan.md` over `prompt.md` inside the container using `-v $(pwd)/prompt-plan.md:/workspace/prompt.md:ro`. Verify this works:
+
+```bash
+# The bind mount should shadow the workspace prompt.md
+docker run --rm \
+  -v "$(pwd):/workspace" \
+  -v "$(pwd)/prompt-plan.md:/workspace/prompt.md:ro" \
+  ubuntu:24.04 cat /workspace/prompt.md | head -3
+# Should show the first line of prompt-plan.md, not prompt.md
+```
+
+### 4. Gaps not yet addressed
+
+These were noted in the HANDOFF-2 review but not fixed. Decide whether they need attention:
+
+- `PLAN.md`, `CHANGELOG.md`, and `BLOCKED.md` are referenced throughout but no stub/template files exist. `BLOCKED.md` is auto-created by `loop.sh`. `PLAN.md` and `CHANGELOG.md` must be created by the user. README mentions them but doesn't provide templates. Should there be stub files?
+- `loop.sh` context expansion greps `PLAN.md` directly for `'\- \[ \]'` (line ~146). PLAN.md is a thin index; unchecked sub-plan names are not the same as unchecked task steps. Is this good enough for context, or misleading?
+- The dead haiku branch in `get_step_spec`'s inner for loop (`if [ "$m" = "haiku" ]`) — `above[]` never contains haiku, so this branch never fires. Harmless, but clutters the logic.
 
 ---
 

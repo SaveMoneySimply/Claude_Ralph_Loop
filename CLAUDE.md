@@ -210,7 +210,7 @@ done
 
 ### prompt.md — navigation wrapper
 
-Lives at project root. Under ~30 lines — re-read every iteration. Tells Claude: read state files, find the next unchecked step in the highest-priority task, execute it, write `.ralph/last-task.txt`. Starter template in the README.
+Lives at project root. Under ~30 lines — re-read every iteration. Tells Claude: read state files, find the next unchecked step in the highest-priority task, execute it, write `.ralph/last-task.txt`. Ships with the template repo — edit only if your project needs custom navigation logic.
 
 ### State files
 

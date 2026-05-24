@@ -4,11 +4,11 @@ These preferences apply across all projects.
 
 ## File scope
 
-This file (`CLAUDE.md`) is **global**. It lives at `~/.claude/CLAUDE.md` on the host and applies to every project. Working standards only — no project-specific facts.
+This file (`CLAUDE.md`) lives at the **project root** and is checked into the repo. This repo is a base template — fork it for new projects. CLAUDE.md travels with the fork and applies working standards for that project. Working standards only — no project-specific facts.
 
-Each project has its own **`ARCHITECTURE.md`** at its root. That's where project facts live: stack, runtime, key folders, page map, deploy topology, test command. The agent reads both each session — global rules from this file plus project facts from ARCHITECTURE.md.
+Each project has its own **`ARCHITECTURE.md`** at its root. That's where project facts live: stack, runtime, key folders, page map, deploy topology, test command. The agent reads both each session — working standards from this file plus project facts from ARCHITECTURE.md.
 
-**Both files are read-only to the agent.** CLAUDE.md is mounted `:ro` into the container; ARCHITECTURE.md is chmodded `0444` at container init. If the agent thinks either needs to change, it writes a proposal and stops for human review — see "Read-only files and the review pattern" at the end.
+**Both files are read-only to the agent.** In loop mode, `init-firewall.sh` chmodds both `CLAUDE.md` and `ARCHITECTURE.md` to `0444` at container init. If the agent thinks either needs to change, it writes a proposal and stops for human review — see "Read-only files and the review pattern" at the end.
 
 ## Two modes: interactive vs loop
 
@@ -213,7 +213,7 @@ How TEST.md interacts with the per-task workflow:
 
 ### Why this works
 
-- A fresh session reads CLAUDE.md (global rules) + ARCHITECTURE.md (project facts) + CHANGELOG.md (history) + `PLAN.md` (current plans) + `TEST.md` (open verifications) and is oriented in minutes
+- A fresh session reads CLAUDE.md (working standards) + ARCHITECTURE.md (project facts) + CHANGELOG.md (history) + `PLAN.md` (current plans) + `TEST.md` (open verifications) and is oriented in minutes
 - Index files (PLAN.md, ROUTINES.md) never duplicate content — they only point at sub-docs, preventing drift
 - Completed work doesn't grow ARCHITECTURE.md or eat context every session
 - Past task .md files stay searchable without being loaded by default
@@ -263,7 +263,7 @@ Lives at project root. Stays short (under 100 lines) because Claude re-reads it 
 
 ```md
 You are running in Ralph loop mode in a sandboxed container.
-CLAUDE.md is your operating manual — global working standards.
+CLAUDE.md is your operating manual — project working standards (read-only to you).
 ARCHITECTURE.md describes this specific project (read-only to you).
 
 Each iteration, you must:
@@ -307,7 +307,7 @@ Write any assumption you made into the task .md so a human can audit later.
 
 | File | Purpose | Owner |
 |---|---|---|
-| `CLAUDE.md` | Global working standards (mounted `:ro`) | human only — agent reads |
+| `CLAUDE.md` | Project working standards (chmod 0444) | human only — agent reads |
 | `ARCHITECTURE.md` | What this project is (chmod 0444) | human only — agent reads, proposes changes via review |
 | `PLAN.md` | Index of sub-plans + priority order | shared |
 | `plans/*.md` | Each domain's checklist | shared |
@@ -391,8 +391,7 @@ A single `ralph.sh` at project root builds and runs the container. (Detailed scr
 
 - **Base image** — Ubuntu + Node + `@anthropic-ai/claude-code` (via npm) + git, jq, ripgrep, curl. Non-root user.
 - **Workspace mount** — `$(pwd):/workspace` (read-write for the agent's work).
-- **Global CLAUDE.md mount** — `$HOME/.claude/CLAUDE.md:/home/claude/.claude/CLAUDE.md:ro`. Claude Code looks for `~/.claude/CLAUDE.md` automatically.
-- **ARCHITECTURE.md** — at container init, `chmod 0444 /workspace/ARCHITECTURE.md` so the non-root agent can't write to it at the OS level.
+- **CLAUDE.md and ARCHITECTURE.md** — both live in `/workspace` (project root). At container init, `init-firewall.sh` runs `chmod 0444 /workspace/CLAUDE.md /workspace/ARCHITECTURE.md` so the non-root agent can't write to either at the OS level. No separate host mount needed.
 - **Firewall** — iptables blocks all egress by default; init script allowlists only what's needed.
 - **NTFY_TOPIC** — passed through as env var so `loop.sh` can curl notifications.
 - **Caps** — `--cap-add=NET_ADMIN --cap-add=NET_RAW` so the firewall init can run iptables.
@@ -456,7 +455,7 @@ See CLAUDE.md → Autonomous Loop for the full pattern.
 
 Some files are inputs to the agent, not outputs. The agent reads them to orient or follow instructions but must never modify them. Current read-only list:
 
-- **CLAUDE.md** — global working standards. Mounted `:ro` from host `~/.claude/CLAUDE.md`.
+- **CLAUDE.md** — project working standards. Lives at project root, checked into git. Chmodded `0444` inside the container.
 - **ARCHITECTURE.md** — per-project description. Chmodded `0444` inside the container.
 
 If the agent believes a read-only file needs to change to complete a task, that's a signal something more fundamental is happening — a new architectural direction, a change in working standards. Those decisions belong to a human, not the agent.

@@ -51,11 +51,7 @@ get_step_spec() {
     esac
 
     for m in "${above[@]}"; do
-        if [ "$m" = "haiku" ]; then
-            seq+=("haiku:")
-        else
-            seq+=("${m}:low" "${m}:max")
-        fi
+        seq+=("${m}:low" "${m}:max")
     done
 
     seq+=(context_expansion split blocked)

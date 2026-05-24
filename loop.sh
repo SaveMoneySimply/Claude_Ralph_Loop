@@ -18,10 +18,30 @@ while [ ! -f STOP ]; do
     ITER_TASK=".ralph/iter-${i}-task.txt"
     ITER_ERR=".ralph/iter-${i}-stderr.log"
 
-    # Run claude. Agent is expected to write .ralph/last-task.txt with the
-    # short name of the task it worked on (e.g. "fix-cashback-cpp").
+    # Read model and effort from the current task header (set before this iteration)
+    CURRENT_TASK_PREVIEW=$(cat .ralph/last-task.txt 2>/dev/null || echo "")
+    MODEL=sonnet
+    EFFORT=high
+    if [ -n "$CURRENT_TASK_PREVIEW" ] && [ -f "tasks/active/${CURRENT_TASK_PREVIEW}.md" ]; then
+        _M=$(grep -oiP '(?<=\bModel:\*\*\s{0,5}|\bModel:\s{0,5})\w+' \
+            "tasks/active/${CURRENT_TASK_PREVIEW}.md" 2>/dev/null | head -1 | tr '[:upper:]' '[:lower:]')
+        _E=$(grep -oiP '(?<=\bEffort:\*\*\s{0,5}|\bEffort:\s{0,5})\w+' \
+            "tasks/active/${CURRENT_TASK_PREVIEW}.md" 2>/dev/null | head -1 | tr '[:upper:]' '[:lower:]')
+        [ -n "$_M" ] && MODEL="$_M"
+        [ -n "$_E" ] && EFFORT="$_E"
+    fi
+
+    # Build claude invocation — haiku doesn't support --effort
+    CLAUDE_ARGS="--model $MODEL"
+    [ "$MODEL" != "haiku" ] && CLAUDE_ARGS="$CLAUDE_ARGS --effort $EFFORT"
+    CLAUDE_ARGS="$CLAUDE_ARGS --bare -p --output-format json --dangerously-skip-permissions"
+
+    echo "Model: $MODEL | Effort: $EFFORT"
+
+    # Agent writes .ralph/last-task.txt with the task short name each iteration
+    # shellcheck disable=SC2086
     if ! cat prompt.md \
-            | claude -p --output-format json --dangerously-skip-permissions \
+            | claude $CLAUDE_ARGS \
             > "$ITER_JSON" 2>"$ITER_ERR"; then
         echo "WARNING: claude exited non-zero on iteration $i — see $ITER_ERR"
         cat "$ITER_ERR" || true

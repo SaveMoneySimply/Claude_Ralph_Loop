@@ -5,8 +5,8 @@ This file lives at the project root and is checked into the repo. Fork this repo
 ## Operating Principles
 
 - **Simple first** — when two approaches exist, take the simpler one
-- **One step per iteration** — execute one step from the current task file, test, commit if done, exit; the next iteration continues
-- **On failure** — try one targeted fix and re-run; if still failing, increment `Attempts:` in the task header; at 3/3, move to `BLOCKED.md` with the captured error output and move on
+- **One step per iteration** — execute one step from the current task file, write `pass` or `fail` to `.ralph/last-result.txt`, exit; the next iteration continues
+- **On failure** — `loop.sh` escalates automatically: same model + max effort → next model → context expansion → task split → BLOCKED (see Recovery and Escalation)
 
 ## Workflow Phases
 
@@ -38,6 +38,8 @@ Each file in `tasks/active/` is the effective prompt for the loop when that task
 
 **Model:** sonnet · **Effort:** high · **Tokens estimated:** 50000 · **Attempts:** 0/3
 **Test command:** npm run build && npm test
+# Sub-tasks only — omit these lines for top-level tasks:
+# **Parent task:** original-name · **Split depth:** 1
 
 ## Steps
 - [ ] Step 1: <what to do> — done when: <acceptance criterion>
@@ -64,6 +66,33 @@ Effort scales:
 - **haiku**: `--effort` omitted
 
 Defaults when header values are missing: `sonnet` + `high`. Unsupported effort levels fall back to the highest supported — no crash.
+
+## Recovery and Escalation
+
+When a step fails, `loop.sh` escalates through this ladder automatically. Each level is tried before moving to the next.
+
+| Step | Action | Attempts |
+|---|---|---|
+| 0 | Declared model + declared effort | 2 (self-correction chance) |
+| 1 | Same model + **max** effort | 1 |
+| 2 | Next model + **low** effort | 1 |
+| 3 | Next model + **max** effort | 1 |
+| … | (repeat up through opus + max) | 1 each |
+| N | **Context expansion** — injects last 2 done tasks + next 2 planned tasks into the prompt | 1 |
+| N+1 | **Task split** — if autonomy: high and split depth < 2 | — |
+| final | → BLOCKED.md | — |
+
+**Autonomy setting** (in `ARCHITECTURE.md` under `## Ralph settings`):
+- `autonomy: high` — full escalation ladder + recursive splitting up to depth 2
+- `autonomy: low` (default) — escalation ladder only; no splitting; any ladder exhaustion → STOP
+
+**Budget exceeded** (2× token estimate):
+- `autonomy: high` → schedule a task split next iteration
+- `autonomy: low` → STOP immediately for human review
+
+**Task splitting**: the original task moves to `tasks/done/` marked `**Split into:** part-1, part-2`. Sub-tasks are created in `tasks/active/` with `**Parent task:**` and `**Split depth:**` headers. Sub-tasks at depth 2 cannot be split further — they go straight to BLOCKED if exhausted.
+
+**Recovery log**: every attempt is appended to `.ralph/recovery-log.jsonl` for future analysis and tuning.
 
 ## Stop Conditions
 

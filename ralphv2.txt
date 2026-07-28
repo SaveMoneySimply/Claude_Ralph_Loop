@@ -1,0 +1,161 @@
+Perfect. Let’s integrate this into a single, cohesive **"Manager-Worker" update specification**.
+
+You can hand this directly to Claude so it can build out the v2 architecture—complete with the file system isolation, the token-stripping execution loop, and the new high-altitude **Autonomous Director** recovery layer.
+
+---
+
+# Ralph v2 Addendum — The Autonomous Director Layer
+
+This addendum details the implementation of a two-tier **Manager-Worker (Orchestrator-Agent)** architecture for Ralph v2.
+
+## 1. Architectural Philosophy
+
+* **The Worker (`loop.sh`):** A fast, single-minded, hyper-focused tactical agent. It operates with a heavily stripped context window, executing exactly *one* code change step at a time.
+
+
+* **The Director (`director.sh`):** A high-altitude, strategic agent running on a heavy model configuration (`opus + max effort`). It is decoupled from the daily loop and only invokes asynchronously when the project requires strategic re-direction, or when the worker hits a terminal roadblock and freezes.
+
+
+
+```
+                     ┌────────────────────────┐
+                     │   Director Claude      │ <─── Interacts with Human
+                     └───────────┬────────────┘      (Reviews roadmap, shifts goals)
+                                 │
+             ┌───────────────────┴───────────────────┐
+             ▼                                       ▼
+     [Normal Operation]                       [On System Failure]
+     • Reviews task velocity                  • Analyzes BLOCKED.md & logs
+     • Re-prioritizes tasks/queue/            • Diagnoses the root cause
+     • Adjusts ARCHITECTURE.md via review     • Rewrites/Splits the broken task
+             │                                • Deletes STOP -> Restarts Ralph
+             ▼                                       │
+   ┌────────────────────────────────────────┐        │
+   │          Ralph v2 Engine               │ <──────┘
+   │  (Isolated, single-checkbox execution)  │
+   └────────────────────────────────────────┘
+
+```
+
+---
+
+## 2. Directory-Driven State Management
+
+Because Ralph v2 organizes tasks across physical folders, the Director can manipulate project direction, re-prioritize code paths, or heal failures entirely through standard filesystem commands—never needing complex text parsers.
+
+```
+tasks/
+├── 0_backlog/        ← High-level requirements and un-itemized tasks[cite: 1]
+├── 1_queue/          ← Items broken down by Phase 2, ordered alphabetically/numerically
+├── 2_active/         ← The single isolated task file Ralph is currently executing (Max: 1)
+└── 3_done/           ← Archived historical task completions[cite: 1, 5]
+
+```
+
+---
+
+## 3. Automated Self-Healing Logic
+
+When the Worker loop exhausts its entire escalation ladder or fails a testing gate 3 times, instead of immediately stopping and waiting for a human, it logs the failure to `BLOCKED.md` and calls the Director to automate recovery.
+
+### The Self-Healing Sequence
+
+1. **The Hand-off:** `loop.sh` detects a terminal fallback and triggers the Director:
+
+
+```bash
+
+```
+
+
+
+bash /engine/director.sh --heal "$CURRENT_TASK"
+
+```
+2. **The Context Injection:** The Director is instantiated with a massive, clean context window. It reads:
+   * `ARCHITECTURE.md` (the source of truth spec)[cite: 1].
+   * `BLOCKED.md` (the exact failure details, terminal logs, and code stack trace)[cite: 1].
+   * The active task file from `tasks/2_active/`[cite: 1].
+3. **The Diagnostics:** Because the Director is a fresh context unpolluted by the repetitive iterations of the loop, it diagnoses the structural blind spot (e.g., an unhandled dependency version conflict, or an overly complex task definition).
+4. **The Intervention:** The Director fixes the block by:
+   * Directly resolving the small structural code block itself, OR
+   * Pulling the blocked file out of `tasks/2_active/`, splitting it into smaller, simpler, more sequential tasks, and placing them back at the front of `tasks/1_queue/`[cite: 1].
+5. **The Resurrection:** The Director wipes `BLOCKED.md`, clears out the `STOP` sentinel file, and automatically spins `loop.sh` back up to keep the development cycle moving forward[cite: 1, 2].
+
+---
+
+## 4. Implementation Blueprint: Global Engine Layer
+
+Add this script to the global read-only engine directory (`~/tools/ralph/director.sh`).
+
+```bash
+#!/usr/bin/env bash
+# /engine/director.sh
+set -uo pipefail
+
+cd /workspace
+
+ACTION="${1:---review}"
+BLOCKED_TASK=$(cat .ralph/last-task.txt 2>/dev/null || echo "")
+
+if [ "$ACTION" = "--heal" ] && [ -n "$BLOCKED_TASK" ]; then
+    echo "🚨 Worker Blocked. Director Claude initializing recovery engineering..."
+
+    # 1. Compile full diagnostic context payload for the heavy model
+    DIAGNOSIS_CONTEXT="The developer loop has halted on task: $BLOCKED_TASK.
+    
+    Review ARCHITECTURE.md, the current codebase state, and the failure evidence captured in BLOCKED.md.
+    
+    Determine the logical bottleneck. Then, solve the block or split the task into simpler, explicit sub-tasks in tasks/1_queue/ to bypass the failure."
+
+    # 2. Invoke high-altitude Claude with maximum effort
+    echo -e "$DIAGNOSIS_CONTEXT" | claude --model opus --effort max --bare > .ralph/director_remedy.log
+
+    # 3. Post-intervention cleanup: if the Director has refactored/split the tasks, unblock the engine
+    if [ -f STOP ]; then
+        rm -f STOP
+        echo "✅ Director has re-engineered the roadmap. Resuming Ralph execution loop..."
+        # Clear recovery state files and restart the engine
+        rm -f ".ralph/${BLOCKED_TASK}-recovery.json" 2>/dev/null
+        exit 0
+    fi
+fi
+
+# --- ROUTINE ROADMAP REVIEW MODE ---
+if [ "$ACTION" = "--review" ]; then
+    echo "📋 Director evaluating overall project path and task queue alignment..."
+    # High-level assessment code to sort files in tasks/1_queue/ goes here
+fi
+
+```
+
+### Hooking the Director into `loop.sh`
+
+Inside the main execution loop (`/engine/loop.sh`), replace the terminal `blocked` state handler:
+
+```bash
+# Inside loop.sh's main execution loop
+elif [ "$STEP_SPEC" = "blocked" ]; then
+    mark_blocked "$CURRENT_TASK" "Full escalation ladder exhausted." 0[cite: 5]
+    echo "Blocked: ${CURRENT_TASK} — Escapes to Director" > STOP[cite: 5]
+    
+    # Hand off execution control to the Director for self-healing
+    bash /engine/director.sh --heal "$CURRENT_TASK"
+    
+    # Check if Director cleared the block and removed the STOP file
+    if [ ! -f STOP ]; then
+        continue # Restart loop immediately without dropping out to the host
+    fi
+    break
+fi
+
+```
+
+---
+
+## 5. Architectural Benefits
+
+* **Context Window Hygiene:** The worker runs with minimal tokens, keeping execution loops exceptionally cheap and fast. The larger, expensive context window (`opus + max effort`) is treated as an emergency resource, consumed only when structural decisions are required.
+
+
+* **Logical Circuit Breaking:** This effectively eliminates loop-fixation where an agent tries to apply the exact same failing patch repeatedly. The Director acts as a clean, objective supervisor capable of altering the task requirements to unstick the project autonomously.
